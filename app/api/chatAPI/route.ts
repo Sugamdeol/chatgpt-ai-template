@@ -1,5 +1,6 @@
-import { PollinationsTextStream } from '@/utils/pollinationsApi'; // Adjust the import path as needed
-import { ChatBody } from '@/types/types'; // Keep this import if you use it
+// app/api/route.ts
+import { PollinationsTextStream } from '@/utils/chatStream';
+import { ChatBody } from '@/types/types';
 
 export const runtime = 'edge';
 
