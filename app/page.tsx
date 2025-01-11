@@ -22,20 +22,23 @@ import {
 import { useEffect, useState } from 'react';
 import { MdAutoAwesome, MdBolt, MdEdit, MdPerson } from 'react-icons/md';
 import Bg from '../public/img/chat/bg-image.png';
+import { PollinationsTextStream } from '@/utils/pollinationsApi'; // Import Pollinations API
 
-export default function Chat(props: { apiKeyApp: string }) {
+const Chat: React.FC = () => {
   // Input States
   const [inputOnSubmit, setInputOnSubmit] = useState<string>('');
   const [inputCode, setInputCode] = useState<string>('');
   // Response message
   const [outputCode, setOutputCode] = useState<string>('');
   // ChatGPT model
-  const [model, setModel] = useState<OpenAIModel>('gpt-4o');
+  const [model, setModel] = useState<OpenAIModel>('mistral'); // Default to 'mistral'
+  // System Prompt
+  const [systemPrompt, setSystemPrompt] = useState<string>('');
+  //Json Mode
+  const [jsonMode, setJsonMode] = useState<boolean>(false);
   // Loading state
   const [loading, setLoading] = useState<boolean>(false);
 
-  // API Key
-  // const [apiKey, setApiKey] = useState<string>(apiKeyApp);
   const borderColor = useColorModeValue('gray.200', 'whiteAlpha.200');
   const inputColor = useColorModeValue('navy.700', 'white');
   const iconColor = useColorModeValue('brand.500', 'white');
@@ -56,16 +59,9 @@ export default function Chat(props: { apiKeyApp: string }) {
     { color: 'whiteAlpha.600' },
   );
   const handleTranslate = async () => {
-    let apiKey = localStorage.getItem('apiKey');
     setInputOnSubmit(inputCode);
 
-    // Chat post conditions(maximum number of characters, valid message etc.)
-    const maxCodeLength = model === 'gpt-4o' ? 700 : 700;
-
-    if (!apiKey?.includes('sk-')) {
-      alert('Please enter an API key.');
-      return;
-    }
+    const maxCodeLength = 700; // maximum message size
 
     if (!inputCode) {
       alert('Please enter your message.');
@@ -80,73 +76,33 @@ export default function Chat(props: { apiKeyApp: string }) {
     }
     setOutputCode(' ');
     setLoading(true);
-    const controller = new AbortController();
-    const body: ChatBody = {
-      inputCode,
-      model,
-      apiKey,
-    };
 
-    // -------------- Fetch --------------
-    const response = await fetch('./api/chatAPI', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-      body: JSON.stringify(body),
-    });
+    try {
+      // Call Pollinations API stream
+      const stream = await PollinationsTextStream(
+        inputCode,
+        model,
+        systemPrompt,
+        jsonMode,
+      );
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
 
-    if (!response.ok) {
-      setLoading(false);
-      if (response) {
-        alert(
-          'Something went wrong went fetching from the API. Make sure to use a valid API key.',
-        );
+      while (!done) {
+        setLoading(true);
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunkValue = decoder.decode(value);
+        setOutputCode((prevCode) => prevCode + chunkValue);
       }
-      return;
-    }
-
-    const data = response.body;
-
-    if (!data) {
+    } catch (error) {
+      console.error('Error fetching from Pollinations API:', error);
+      alert('Something went wrong when fetching from the Pollinations API.');
+    } finally {
       setLoading(false);
-      alert('Something went wrong');
-      return;
     }
-
-    const reader = data.getReader();
-    const decoder = new TextDecoder();
-    let done = false;
-
-    while (!done) {
-      setLoading(true);
-      const { value, done: doneReading } = await reader.read();
-      done = doneReading;
-      const chunkValue = decoder.decode(value);
-      setOutputCode((prevCode) => prevCode + chunkValue);
-    }
-
-    setLoading(false);
   };
-  // -------------- Copy Response --------------
-  // const copyToClipboard = (text: string) => {
-  //   const el = document.createElement('textarea');
-  //   el.value = text;
-  //   document.body.appendChild(el);
-  //   el.select();
-  //   document.execCommand('copy');
-  //   document.body.removeChild(el);
-  // };
-
-  // *** Initializing apiKey with .env.local value
-  // useEffect(() => {
-  // ENV file verison
-  // const apiKeyENV = process.env.NEXT_PUBLIC_OPENAI_API_KEY
-  // if (apiKey === undefined || null) {
-  //   setApiKey(apiKeyENV)
-  // }
-  // }, [])
 
   const handleChange = (Event: any) => {
     setInputCode(Event.target.value);
@@ -176,27 +132,21 @@ export default function Chat(props: { apiKeyApp: string }) {
       >
         {/* Model Change */}
         <Flex direction={'column'} w="100%" mb={outputCode ? '20px' : 'auto'}>
-          <Flex
-            mx="auto"
-            zIndex="2"
-            w="max-content"
-            mb="20px"
-            borderRadius="60px"
-          >
+          <Flex mx="auto" zIndex="2" w="max-content" mb="20px" borderRadius="60px">
             <Flex
               cursor={'pointer'}
               transition="0.3s"
               justify={'center'}
               align="center"
-              bg={model === 'gpt-4o' ? buttonBg : 'transparent'}
+              bg={model === 'mistral' ? buttonBg : 'transparent'}
               w="174px"
               h="70px"
-              boxShadow={model === 'gpt-4o' ? buttonShadow : 'none'}
+              boxShadow={model === 'mistral' ? buttonShadow : 'none'}
               borderRadius="14px"
               color={textColor}
               fontSize="18px"
               fontWeight={'700'}
-              onClick={() => setModel('gpt-4o')}
+              onClick={() => setModel('mistral')}
             >
               <Flex
                 borderRadius="full"
@@ -214,22 +164,22 @@ export default function Chat(props: { apiKeyApp: string }) {
                   color={iconColor}
                 />
               </Flex>
-              GPT-4o
+              Mistral
             </Flex>
             <Flex
               cursor={'pointer'}
               transition="0.3s"
               justify={'center'}
               align="center"
-              bg={model === 'gpt-3.5-turbo' ? buttonBg : 'transparent'}
+              bg={model === 'openai' ? buttonBg : 'transparent'}
               w="164px"
               h="70px"
-              boxShadow={model === 'gpt-3.5-turbo' ? buttonShadow : 'none'}
+              boxShadow={model === 'openai' ? buttonShadow : 'none'}
               borderRadius="14px"
               color={textColor}
               fontSize="18px"
               fontWeight={'700'}
-              onClick={() => setModel('gpt-3.5-turbo')}
+              onClick={() => setModel('openai')}
             >
               <Flex
                 borderRadius="full"
@@ -240,14 +190,9 @@ export default function Chat(props: { apiKeyApp: string }) {
                 h="39px"
                 w="39px"
               >
-                <Icon
-                  as={MdBolt}
-                  width="20px"
-                  height="20px"
-                  color={iconColor}
-                />
+                <Icon as={MdBolt} width="20px" height="20px" color={iconColor} />
               </Flex>
-              GPT-3.5
+              OpenAI
             </Flex>
           </Flex>
 
@@ -356,11 +301,7 @@ export default function Chat(props: { apiKeyApp: string }) {
           </Flex>
         </Flex>
         {/* Chat Input */}
-        <Flex
-          ms={{ base: '0px', xl: '60px' }}
-          mt="20px"
-          justifySelf={'flex-end'}
-        >
+        <Flex ms={{ base: '0px', xl: '60px' }} mt="20px" justifySelf={'flex-end'}>
           <Input
             minH="54px"
             h="100%"
@@ -408,8 +349,8 @@ export default function Chat(props: { apiKeyApp: string }) {
           alignItems="center"
         >
           <Text fontSize="xs" textAlign="center" color={gray}>
-            Free Research Preview. ChatGPT may produce inaccurate information
-            about people, places, or facts.
+            Free Research Preview. Pollinations AI may produce inaccurate
+            information about people, places, or facts.
           </Text>
           <Link href="https://help.openai.com/en/articles/6825453-chatgpt-release-notes">
             <Text
@@ -418,11 +359,13 @@ export default function Chat(props: { apiKeyApp: string }) {
               fontWeight="500"
               textDecoration="underline"
             >
-              ChatGPT May 12 Version
+              Pollinations AI May 12 Version
             </Text>
           </Link>
         </Flex>
       </Flex>
     </Flex>
   );
-            }
+};
+
+export default Chat;
