@@ -22,7 +22,7 @@ import {
 import { useEffect, useState } from 'react';
 import { MdAutoAwesome, MdBolt, MdEdit, MdPerson } from 'react-icons/md';
 import Bg from '../public/img/chat/bg-image.png';
-import { PollinationsTextStream } from '@/utils/pollinationsApi'; // Import Pollinations API
+import { PollinationsTextStream } from '@/utils/ChatStream.ts'; // Import Pollinations API
 
 const Chat: React.FC = () => {
   // Input States
